@@ -141,15 +141,19 @@ function initLoginPage() {
 // ==========================================
 // МАТЕРИАЛЫ
 // ==========================================
+let allMaterialsCache = [];
+
 async function loadMaterials() {
     const tableBody = document.getElementById('materialsTableBody');
     const loadingState = document.getElementById('materialsLoading');
     const emptyState = document.getElementById('materialsEmpty');
+    const titleText = document.getElementById('materialsTitleText');
 
     if (!tableBody) return;
 
     if (loadingState) loadingState.classList.remove('d-none');
     if (emptyState) emptyState.classList.add('d-none');
+    if (titleText) titleText.textContent = 'Склад';
     tableBody.innerHTML = '';
 
     try {
@@ -159,6 +163,7 @@ async function loadMaterials() {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
         const materials = await res.json();
+        allMaterialsCache = materials;
         renderMaterialsTable(materials);
     } catch (e) {
         if (e.message !== 'unauthorized') {
@@ -170,7 +175,57 @@ async function loadMaterials() {
     }
 }
 
-function renderMaterialsTable(materials) {
+async function loadLowStockMaterials() {
+    const tableBody = document.getElementById('materialsTableBody');
+    const loadingState = document.getElementById('materialsLoading');
+    const emptyState = document.getElementById('materialsEmpty');
+    const titleText = document.getElementById('materialsTitleText');
+    const thresholdInput = document.getElementById('lowStockThreshold');
+
+    if (!tableBody) return;
+
+    const threshold = parseFloat(thresholdInput.value);
+    if (isNaN(threshold) || threshold < 0) {
+        UI.showAlert('materialsAlert', 'Введите корректный порог (число ≥ 0)', 'danger');
+        return;
+    }
+
+    if (loadingState) loadingState.classList.remove('d-none');
+    if (emptyState) emptyState.classList.add('d-none');
+    tableBody.innerHTML = '';
+    UI.clearAlert('materialsAlert');
+
+    try {
+        const res = await apiFetch(`${API_BASE_URL}/materials/low-stock?threshold=${threshold}`, {
+            headers: { 'Authorization': `Bearer ${Auth.getToken()}` }
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+        const data = await res.json();
+        if (titleText) titleText.textContent = `Мало на складе (порог: ${data.threshold})`;
+
+        if (!data.items || data.items.length === 0) {
+            if (emptyState) {
+                emptyState.textContent = `Материалов с остатком ниже ${data.threshold} нет.`;
+                emptyState.classList.remove('d-none');
+            }
+            const counter = document.getElementById('materialsCount');
+            if (counter) counter.textContent = 0;
+            return;
+        }
+
+        renderMaterialsTable(data.items, true);
+    } catch (e) {
+        if (e.message !== 'unauthorized') {
+            console.error('[low-stock]', e);
+            UI.showAlert('materialsAlert', 'Не удалось загрузить отчёт', 'danger');
+        }
+    } finally {
+        if (loadingState) loadingState.classList.add('d-none');
+    }
+}
+
+function renderMaterialsTable(materials, lowStockMode = false) {
     const tableBody = document.getElementById('materialsTableBody');
     const emptyState = document.getElementById('materialsEmpty');
     const counterBadge = document.getElementById('materialsCount');
@@ -181,7 +236,10 @@ function renderMaterialsTable(materials) {
     if (counterBadge) counterBadge.textContent = materials.length;
 
     if (!materials || materials.length === 0) {
-        if (emptyState) emptyState.classList.remove('d-none');
+        if (!lowStockMode && emptyState) {
+            emptyState.textContent = 'Материалов пока нет. Создайте поступление.';
+            emptyState.classList.remove('d-none');
+        }
         return;
     }
     if (emptyState) emptyState.classList.add('d-none');
@@ -191,11 +249,13 @@ function renderMaterialsTable(materials) {
     materials.forEach(m => {
         const tr = document.createElement('tr');
         const unitName = units[m.measurement_unit_id] || 'шт.';
+        const qtyClass = lowStockMode ? 'fw-bold text-danger' : 'fw-bold text-primary';
+
         tr.innerHTML = `
             <td>${m.id}</td>
             <td class="fw-bold">${escapeHtml(m.name)}</td>
             <td>${unitName}</td>
-            <td class="fw-bold text-primary">${m.quantity || 0} ${unitName}</td>
+            <td class="${qtyClass}">${m.quantity || 0} ${unitName}</td>
             <td>${escapeHtml(m.description || '—')}</td>
             <td>
                 <button class="btn btn-sm btn-outline-primary me-1" onclick="openEditMaterial(${m.id})" title="Редактировать">✏️</button>
@@ -259,6 +319,16 @@ window.deleteMaterial = deleteMaterial;
 function initMaterialsPage() {
     Auth.checkAuth();
     loadMaterials();
+
+    const lowStockBtn = document.getElementById('showLowStockBtn');
+    if (lowStockBtn) {
+        lowStockBtn.addEventListener('click', loadLowStockMaterials);
+    }
+
+    const showAllBtn = document.getElementById('showAllMaterialsBtn');
+    if (showAllBtn) {
+        showAllBtn.addEventListener('click', loadMaterials);
+    }
 
     const form = document.getElementById('editMaterialForm');
     if (form) {
