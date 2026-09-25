@@ -43,6 +43,14 @@
                 <h1 class="h3 fw-bold text-dark mb-1">Материалы на складе</h1>
                 <p class="text-secondary small mb-0">Текущие остатки материалов</p>
             </div>
+            <div class="d-flex gap-2 align-items-end">
+                <div>
+                    <label for="lowStockThreshold" class="form-label small text-muted mb-1">Порог остатка</label>
+                    <input type="number" step="1" min="0" class="form-control form-control-sm" id="lowStockThreshold" value="10" style="width: 100px;">
+                </div>
+                <button type="button" class="btn btn-warning btn-sm" id="showLowStockBtn">⚠️ Показать мало</button>
+                <button type="button" class="btn btn-outline-secondary btn-sm" id="showAllMaterialsBtn">Показать все</button>
+            </div>
         </div>
 
         <div id="materialsAlert" role="region" aria-live="polite"></div>
@@ -50,7 +58,8 @@
         <div class="card card-warehouse">
             <div class="card-warehouse-header">
                 <h2 class="card-warehouse-title">
-                    Склад <span id="materialsCount" class="badge bg-secondary ms-2">0</span>
+                    <span id="materialsTitleText">Склад</span>
+                    <span id="materialsCount" class="badge bg-secondary ms-2">0</span>
                 </h2>
             </div>
             <div class="card-warehouse-body p-0">
@@ -129,6 +138,6 @@
     </footer>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="/static/js/app.js?v=6"></script>
+    <script src="/static/js/app.js?v=7"></script>
 </body>
 </html>
