@@ -1,0 +1,37 @@
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: warehouse_db
+    restart: always
+    environment:
+      POSTGRES_USER: warehouse_user
+      POSTGRES_PASSWORD: secure_password_123
+      POSTGRES_DB: warehouse_db
+    ports:
+      - "5433:5432" 
+    volumes:
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U warehouse_user -d warehouse_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  app:
+    build: .
+    container_name: warehouse_app
+    restart: always
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql+asyncpg://warehouse_user:secure_password_123@db:5432/warehouse_db
+      SECRET_KEY: change_me_in_production
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - .:/code
+
+volumes:
+  postgres_data:

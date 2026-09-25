@@ -1,0 +1,298 @@
+/* ==========================================================================
+   Складской учёт (ИС-СУ) — Основные стили
+   Разработано согласно аудиту антипаттернов (Этап 1):
+   - Никаких градиентов фона, неоновых свечений и псевдо-стекломорфизма (backdrop-blur)
+   - Строгая индустриальная B2B-палитра (синий / белый / серый)
+   - Контрастность a11y >= 4.5:1 (для основного текста >= 7:1)
+   - Чёткие фокусные состояния :focus-visible
+   - Гибкая верстка без жесткого хардкода высоты
+   ========================================================================== */
+
+:root {
+    /* Базовые цвета поверхностей и границ */
+    --app-bg: #f8fafc;
+    --app-surface: #ffffff;
+    --app-border: #e2e8f0;
+    --app-border-hover: #cbd5e1;
+
+    /* Текстовая палитра */
+    --app-text-primary: #0f172a;    /* Контраст > 7:1 к белому */
+    --app-text-secondary: #475569;  /* Контраст > 4.5:1 к белому */
+    --app-text-muted: #64748b;
+
+    /* Корпоративные акценты */
+    --app-primary: #0d6efd;
+    --app-primary-hover: #0b5ed7;
+    --app-header-bg: #0f172a;
+    --app-header-text: #f8fafc;
+
+    /* Статусные цвета */
+    --app-success: #198754;
+    --app-warning: #d97706;
+    --app-danger: #dc3545;
+    --app-info: #0284c7;
+
+    /* Типографика */
+    --font-family-base: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --font-family-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+}
+
+/* 1. Базовые правила верстки */
+*, *::before, *::after {
+    box-sizing: border-box;
+}
+
+body {
+    font-family: var(--font-family-base);
+    background-color: var(--app-bg);
+    color: var(--app-text-primary);
+    line-height: 1.5;
+    margin: 0;
+    padding: 0;
+}
+
+/* 2. Доступность (a11y) и Фокус */
+a, button, input, select, textarea {
+    transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+}
+
+a:focus-visible, 
+button:focus-visible, 
+input:focus-visible, 
+select:focus-visible, 
+textarea:focus-visible,
+.btn:focus-visible {
+    outline: 2px solid var(--app-primary) !important;
+    outline-offset: 2px !important;
+    box-shadow: none !important;
+}
+
+/* 3. Шапка и навигация */
+.app-navbar {
+    background-color: var(--app-header-bg);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.app-navbar .navbar-brand {
+    color: var(--app-header-text);
+    font-size: 1.15rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.app-navbar .navbar-brand:hover {
+    color: #ffffff;
+}
+
+.app-navbar .nav-link {
+    color: #cbd5e1;
+    font-weight: 500;
+    font-size: 0.9375rem;
+    padding: 0.5rem 0.85rem;
+    border-radius: 0.375rem;
+    transition: color 0.15s ease, background-color 0.15s ease;
+}
+
+.app-navbar .nav-link:hover {
+    color: #ffffff;
+    background-color: rgba(255, 255, 255, 0.08);
+}
+
+.app-navbar .nav-link.active {
+    color: #ffffff;
+    background-color: rgba(13, 110, 253, 0.25);
+    border-left: 3px solid var(--app-primary);
+}
+
+.user-badge {
+    background-color: rgba(255, 255, 255, 0.12);
+    color: #f8fafc;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    padding: 0.35rem 0.65rem;
+    border-radius: 0.375rem;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+/* 4. Карточки и рабочие панели (чистый плоский дизайн без размытия) */
+.card-warehouse {
+    background-color: var(--app-surface);
+    border: 1px solid var(--app-border);
+    border-radius: 0.5rem;
+    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05);
+}
+
+.card-warehouse-header {
+    background-color: #ffffff;
+    border-bottom: 1px solid var(--app-border);
+    padding: 1rem 1.25rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+}
+
+.card-warehouse-title {
+    font-size: 1.15rem;
+    font-weight: 600;
+    color: var(--app-text-primary);
+    margin: 0;
+}
+
+.card-warehouse-body {
+    padding: 1.25rem;
+}
+
+/* 5. Таблицы складского учёта */
+.table-warehouse {
+    margin-bottom: 0;
+    font-size: 0.9375rem;
+}
+
+.table-warehouse thead th {
+    background-color: #f1f5f9;
+    color: var(--app-text-secondary);
+    font-weight: 600;
+    font-size: 0.8125rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    border-bottom: 2px solid var(--app-border);
+    padding: 0.75rem 1rem;
+    vertical-align: middle;
+}
+
+.table-warehouse tbody td {
+    padding: 0.85rem 1rem;
+    vertical-align: middle;
+    border-bottom: 1px solid var(--app-border);
+    color: var(--app-text-primary);
+}
+
+.table-warehouse tbody tr:hover {
+    background-color: #f8fafc;
+}
+
+.num-cell {
+    font-variant-numeric: tabular-nums;
+    font-family: var(--font-family-mono);
+    color: var(--app-text-secondary);
+}
+
+/* 6. Формы и поля ввода с валидацией */
+.form-label {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--app-text-primary);
+    margin-bottom: 0.35rem;
+}
+
+.form-label .required-indicator {
+    color: var(--app-danger);
+    margin-left: 0.2rem;
+}
+
+.form-control, .form-select {
+    border: 1px solid var(--app-border);
+    border-radius: 0.375rem;
+    padding: 0.55rem 0.75rem;
+    font-size: 0.9375rem;
+    color: var(--app-text-primary);
+    background-color: #ffffff;
+}
+
+.form-control:focus, .form-select:focus {
+    border-color: var(--app-primary);
+    box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.15);
+}
+
+.form-text {
+    font-size: 0.8125rem;
+    color: var(--app-text-secondary);
+}
+
+/* 7. UX-состояния (Loading, Empty, Error) */
+.empty-state {
+    padding: 3rem 1.5rem;
+    text-align: center;
+}
+
+.empty-state-icon {
+    font-size: 2.75rem;
+    color: var(--app-text-muted);
+    margin-bottom: 0.75rem;
+}
+
+.empty-state-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--app-text-primary);
+    margin-bottom: 0.35rem;
+}
+
+.empty-state-desc {
+    font-size: 0.9rem;
+    color: var(--app-text-secondary);
+    max-width: 420px;
+    margin: 0 auto 1.25rem;
+}
+
+/* Индикатор загрузки */
+.loading-overlay {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 3rem 1rem;
+    color: var(--app-text-secondary);
+}
+
+/* Бейджи и статусы */
+.badge-unit {
+    background-color: #e2e8f0;
+    color: #334155;
+    font-weight: 600;
+    font-size: 0.75rem;
+    padding: 0.3rem 0.55rem;
+    border-radius: 0.25rem;
+}
+
+.badge-status-active {
+    background-color: #dcfce7;
+    color: #166534;
+    font-weight: 600;
+    font-size: 0.75rem;
+    padding: 0.3rem 0.55rem;
+    border-radius: 0.25rem;
+}
+
+/* 8. Подвал */
+.app-footer {
+    background-color: #ffffff;
+    border-top: 1px solid var(--app-border);
+    color: var(--app-text-secondary);
+    font-size: 0.8125rem;
+    padding: 1rem 0;
+    margin-top: auto;
+}
+
+/* 9. Авторизация */
+.login-wrapper {
+    min-height: calc(100vh - 120px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1.5rem;
+}
+
+.login-card {
+    width: 100%;
+    max-width: 420px;
+    background: #ffffff;
+    border: 1px solid var(--app-border);
+    border-radius: 0.5rem;
+    box-shadow: 0 4px 6px -1px rgba(15, 23, 42, 0.08);
+}
