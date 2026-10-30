@@ -11,9 +11,7 @@ router = APIRouter(prefix="/materials", tags=["Materials"])
 
 @router.get("/")
 async def get_materials(db: AsyncSession = Depends(get_db)):
-    result = await db.execute(
-        select(Material).where(Material.is_active == True).order_by(Material.name)
-    )
+    result = await db.execute(select(Material).where(Material.is_active.is_(True)).order_by(Material.name))
     materials = result.scalars().all()
     return [
         {
@@ -22,7 +20,9 @@ async def get_materials(db: AsyncSession = Depends(get_db)):
             "measurement_unit_id": m.measurement_unit_id,
             "description": m.description or "",
             "is_active": m.is_active,
-            "quantity": float(m.quantity or 0)
+            "quantity": float(m.quantity or 0),
+            "minimum_stock": float(m.minimum_stock or 0),
+            "is_below_minimum": bool(m.minimum_stock and m.quantity < m.minimum_stock),
         }
         for m in materials
     ]
@@ -33,7 +33,7 @@ async def get_low_stock(threshold: float = 10.0, db: AsyncSession = Depends(get_
     """Материалы с остатком ниже заданного порога (по умолчанию — 10)."""
     result = await db.execute(
         select(Material)
-        .where(Material.is_active == True)
+        .where(Material.is_active.is_(True))
         .where(Material.quantity < threshold)
         .order_by(Material.quantity.asc())
     )
@@ -48,10 +48,12 @@ async def get_low_stock(threshold: float = 10.0, db: AsyncSession = Depends(get_
                 "name": m.name,
                 "measurement_unit_id": m.measurement_unit_id,
                 "description": m.description or "",
-                "quantity": float(m.quantity or 0)
+                "quantity": float(m.quantity or 0),
+                "minimum_stock": float(m.minimum_stock or 0),
+                "is_below_minimum": bool(m.minimum_stock and m.quantity < m.minimum_stock),
             }
             for m in materials
-        ]
+        ],
     }
 
 
@@ -65,7 +67,9 @@ async def get_material(material_id: int, db: AsyncSession = Depends(get_db)):
 
 
 @router.post("/", response_model=MaterialResponse, status_code=201)
-async def create_material(material: MaterialCreate, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
+async def create_material(
+    material: MaterialCreate, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)
+):
     result = await db.execute(select(Material).where(Material.name == material.name))
     if result.scalars().first():
         raise HTTPException(status_code=400, detail="такой материал уже есть")
@@ -77,7 +81,12 @@ async def create_material(material: MaterialCreate, db: AsyncSession = Depends(g
 
 
 @router.put("/{material_id}", response_model=MaterialResponse)
-async def update_material(material_id: int, material_data: MaterialUpdate, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
+async def update_material(
+    material_id: int,
+    material_data: MaterialUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     result = await db.execute(select(Material).where(Material.id == material_id))
     material = result.scalars().first()
     if not material:
@@ -98,7 +107,9 @@ async def update_material(material_id: int, material_data: MaterialUpdate, db: A
 
 
 @router.delete("/{material_id}")
-async def delete_material(material_id: int, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
+async def delete_material(
+    material_id: int, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)
+):
     result = await db.execute(select(Material).where(Material.id == material_id))
     material = result.scalars().first()
     if not material:
@@ -109,7 +120,7 @@ async def delete_material(material_id: int, db: AsyncSession = Depends(get_db), 
     if (rc.scalar() or 0) + (ic.scalar() or 0) > 0:
         raise HTTPException(
             status_code=400,
-            detail="Нельзя удалить материал, у которого есть история движений. Сначала удалите связанные документы."
+            detail="Нельзя удалить материал, у которого есть история движений. Сначала удалите связанные документы.",
         )
 
     await db.delete(material)

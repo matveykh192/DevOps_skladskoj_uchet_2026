@@ -6,12 +6,11 @@ from app.config import settings
 engine = create_async_engine(settings.DATABASE_URL, echo=False)
 
 # Фабрика сессий
-AsyncSessionLocal = sessionmaker(
-    engine, class_=AsyncSession, expire_on_commit=False
-)
+AsyncSessionLocal = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
 # Базовый класс для всех ORM-моделей
 Base = declarative_base()
+
 
 # Зависимость для получения сессии БД в роутерах
 async def get_db():

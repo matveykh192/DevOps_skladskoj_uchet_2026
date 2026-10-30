@@ -7,10 +7,12 @@ from app.schemas import SupplierCreate, SupplierUpdate, SupplierResponse
 
 router = APIRouter(prefix="/suppliers", tags=["Suppliers"])
 
+
 @router.get("/", response_model=list[SupplierResponse])
 async def get_suppliers(db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(Supplier).where(Supplier.is_active == True))
+    result = await db.execute(select(Supplier).where(Supplier.is_active.is_(True)))
     return result.scalars().all()
+
 
 @router.get("/{supplier_id}", response_model=SupplierResponse)
 async def get_supplier(supplier_id: int, db: AsyncSession = Depends(get_db)):
@@ -19,6 +21,7 @@ async def get_supplier(supplier_id: int, db: AsyncSession = Depends(get_db)):
     if not supplier or not supplier.is_active:
         raise HTTPException(status_code=404, detail="поставщик не найден")
     return supplier
+
 
 @router.post("/", response_model=SupplierResponse, status_code=201)
 async def create_supplier(supplier: SupplierCreate, db: AsyncSession = Depends(get_db)):
@@ -31,6 +34,7 @@ async def create_supplier(supplier: SupplierCreate, db: AsyncSession = Depends(g
     await db.commit()
     await db.refresh(new_supplier)
     return new_supplier
+
 
 @router.put("/{supplier_id}", response_model=SupplierResponse)
 async def update_supplier(supplier_id: int, supplier_data: SupplierUpdate, db: AsyncSession = Depends(get_db)):
@@ -46,6 +50,7 @@ async def update_supplier(supplier_id: int, supplier_data: SupplierUpdate, db: A
     await db.commit()
     await db.refresh(supplier)
     return supplier
+
 
 @router.delete("/{supplier_id}")
 async def delete_supplier(supplier_id: int, db: AsyncSession = Depends(get_db)):
