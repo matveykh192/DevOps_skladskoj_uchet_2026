@@ -2,36 +2,96 @@ services:
   db:
     image: postgres:15-alpine
     container_name: warehouse_db
-    restart: always
+    restart: unless-stopped
     environment:
       POSTGRES_USER: warehouse_user
-      POSTGRES_PASSWORD: secure_password_123
+      POSTGRES_PASSWORD: ${WAREHOUSE_DB_PASSWORD:-secure_password_123}
       POSTGRES_DB: warehouse_db
-    ports:
-      - "5433:5432" 
+    # DB port is intentionally not published to host (operational security requirement)
     volumes:
-      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U warehouse_user -d warehouse_db"]
       interval: 5s
       timeout: 5s
-      retries: 5
+      retries: 10
+      start_period: 5s
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
+    networks:
+      - warehouse_net
 
   app:
-    build: .
-    container_name: warehouse_app
-    restart: always
-    ports:
-      - "8000:8000"
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          cpus: '0.75'
+          memory: 512M
+        reservations:
+          cpus: '0.1'
+          memory: 128M
     environment:
-      DATABASE_URL: postgresql+asyncpg://warehouse_user:secure_password_123@db:5432/warehouse_db
-      SECRET_KEY: change_me_in_production
+      DATABASE_URL: postgresql+asyncpg://warehouse_user:${WAREHOUSE_DB_PASSWORD:-secure_password_123}@db:5432/warehouse_db
+      DB_HOST: db
+      DB_NAME: warehouse_db
+      SECRET_KEY: ${WAREHOUSE_SECRET_KEY:-local-warehouse-demo-secret-change-me}
     depends_on:
       db:
         condition: service_healthy
+    # Direct access from host is forbidden; accessible only inside warehouse_net via Nginx
+    expose:
+      - "8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    networks:
+      - warehouse_net
+
+  nginx:
+    image: nginx:1.27.2-alpine
+    container_name: warehouse_nginx
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8000:80"
     volumes:
-      - .:/code
+      - ./deploy/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      app:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1/nginx-health || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 3s
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 128M
+        reservations:
+          cpus: '0.05'
+          memory: 32M
+    networks:
+      - warehouse_net
 
 volumes:
   postgres_data:
+
+networks:
+  warehouse_net:
+    driver: bridge

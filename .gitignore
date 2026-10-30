@@ -25,3 +25,16 @@ Thumbs.db
 
 # Docker volumes (опционально, чтобы локальные данные БД не тянулись в Git)
 postgres_data/
+backups/
+# Generated verification artifacts
+reports/
+backups/
+*.before-lr3-partC.bak
+
+# Local installation packages
+lr3_migration_sources.zip
+
+# Local environment
+.env
+.env.*
+!.env.example
