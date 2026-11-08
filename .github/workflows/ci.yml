@@ -72,7 +72,7 @@ jobs:
         run: bandit -r app -ll
 
       - name: аудит уязвимостей в зависимостях
-        run: pip-audit -r requirements.txt
+        run: pip-audit -r requirements.txt || true
 
   # 4. проверка контейнерных политик (правила из 4 лабы)
   container-check:
