@@ -1,0 +1,12 @@
+[allowlist]
+description = "разрешенные тестовые токены и хеши"
+paths = [
+  '''tests/.*''',
+  '''scripts/check_mutation\.ps1''',
+  '''docker-compose\.test\.yml''',
+  '''alembic/.*'''
+]
+regexes = [
+  '''local-testing-key-not-for-production''',
+  '''test_only_not_for_production'''
+]
