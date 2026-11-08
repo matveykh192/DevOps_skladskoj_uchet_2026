@@ -1,0 +1,25 @@
+# Git and cache directories
+.git
+.gitignore
+.ruff_cache
+.pytest_cache
+__pycache__
+*.py[cod]
+*$py.class
+
+# Environment variables and secrets (mandatory security check)
+.env
+.env.*
+!.env.example
+
+# Backup archives and test artifacts
+backups/*.dump
+reports/*.xml
+reports/*.html
+reports/*.junit
+*.zip
+*.tar.gz
+
+# Local OS metadata
+.DS_Store
+Thumbs.db

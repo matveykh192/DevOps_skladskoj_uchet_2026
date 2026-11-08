@@ -1,0 +1,22 @@
+# защита критических файлов репозитория
+# любые изменения в этих файлах требуют обязательного аппрува от владельца
+* @matveykh192
+
+# тесты и тестовые сценарии
+/tests/ @matveykh192
+/docker-compose.test.yml @matveykh192
+/Dockerfile.test @matveykh192
+
+# сборочные файлы и гейты проверок
+/Makefile @matveykh192
+/scripts/container_check.py @matveykh192
+/scripts/check_migrations.py @matveykh192
+/scripts/backup_restore.py @matveykh192
+/scripts/check_mutation.ps1 @matveykh192
+
+# конфигурация линтеров и анализаторов
+/pyproject.toml @matveykh192
+/alembic.ini @matveykh192
+
+# пайплайны непрерывной интеграции (CI)
+/.github/ @matveykh192

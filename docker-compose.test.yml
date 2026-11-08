@@ -1,0 +1,33 @@
+# Dedicated isolated test stack. Run with -p warehouse-lr3-test.
+services:
+  test-db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: warehouse_test_user
+      POSTGRES_PASSWORD: test_only_not_for_production
+      POSTGRES_DB: warehouse_test_db
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U warehouse_test_user -d warehouse_test_db"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+
+  test-runner:
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+    environment:
+      APP_ENV: test
+      DATABASE_URL: postgresql+asyncpg://warehouse_test_user:test_only_not_for_production@test-db:5432/warehouse_test_db
+      DB_HOST: test-db
+      DB_NAME: warehouse_test_db
+      SECRET_KEY: local-testing-key-not-for-production
+      PYTHONPATH: /code
+    depends_on:
+      test-db:
+        condition: service_healthy
+    volumes:
+      - ./reports:/code/reports
+    command: ["pytest", "-q", "tests", "--junitxml=reports/junit.xml", "--cov=app", "--cov-branch", "--cov-report=term-missing", "--cov-report=xml:reports/coverage.xml", "--cov-fail-under=60"]

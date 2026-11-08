@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -7,6 +7,7 @@ from app.models import User
 from app.auth import verify_password, create_access_token
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
+
 
 @router.post("/login")
 async def login(form_data: OAuth2PasswordRequestForm = Depends(), db: AsyncSession = Depends(get_db)):
@@ -20,5 +21,5 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends(), db: AsyncSessi
 
     # создаем токен
     access_token = create_access_token(data={"sub": user.username})
-    
+
     return {"access_token": access_token, "token_type": "bearer"}

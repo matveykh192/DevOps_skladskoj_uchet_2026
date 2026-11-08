@@ -1,4 +1,4 @@
-const API_BASE_URL = 'http://localhost:8000';
+const API_BASE_URL = '';
 
 // ==========================================
 // АВТОРИЗАЦИЯ
@@ -249,13 +249,15 @@ function renderMaterialsTable(materials, lowStockMode = false) {
     materials.forEach(m => {
         const tr = document.createElement('tr');
         const unitName = units[m.measurement_unit_id] || 'шт.';
-        const qtyClass = lowStockMode ? 'fw-bold text-danger' : 'fw-bold text-primary';
+        const belowMinimum = Number(m.minimum_stock || 0) > 0 && Number(m.quantity || 0) < Number(m.minimum_stock);
+        const qtyClass = belowMinimum || lowStockMode ? 'fw-bold text-danger' : 'fw-bold text-primary';
 
         tr.innerHTML = `
             <td>${m.id}</td>
             <td class="fw-bold">${escapeHtml(m.name)}</td>
             <td>${unitName}</td>
-            <td class="${qtyClass}">${m.quantity || 0} ${unitName}</td>
+            <td class="${qtyClass}">${m.quantity || 0} ${unitName}${belowMinimum ? ' <span class="badge bg-warning text-dark" title="Остаток ниже индивидуального минимума">⚠ Мало</span>' : ''}</td>
+            <td>${Number(m.minimum_stock || 0)} ${unitName}</td>
             <td>${escapeHtml(m.description || '—')}</td>
             <td>
                 <button class="btn btn-sm btn-outline-primary me-1" onclick="openEditMaterial(${m.id})" title="Редактировать">✏️</button>
@@ -278,6 +280,7 @@ async function openEditMaterial(id) {
         document.getElementById('editMaterialName').value = m.name;
         document.getElementById('editMaterialUnit').value = m.measurement_unit_id || 1;
         document.getElementById('editMaterialDesc').value = m.description || '';
+        document.getElementById('editMaterialMinimumStock').value = m.minimum_stock ?? 0;
 
         const modal = new bootstrap.Modal(document.getElementById('editMaterialModal'));
         modal.show();
@@ -340,6 +343,12 @@ function initMaterialsPage() {
             const name = document.getElementById('editMaterialName').value.trim();
             const unitId = parseInt(document.getElementById('editMaterialUnit').value);
             const description = document.getElementById('editMaterialDesc').value.trim();
+            const minimumRaw = document.getElementById('editMaterialMinimumStock').value;
+            const minimumStock = Number(minimumRaw);
+            if (minimumRaw.trim() === '' || !Number.isFinite(minimumStock) || minimumStock < 0 || minimumStock > 999999999.999) {
+                UI.showAlert('modalMaterialAlert', 'Минимальный запас должен быть числом от 0 до 999999999.999', 'danger');
+                return;
+            }
 
             if (!name) {
                 UI.showAlert('modalMaterialAlert', 'Введите название', 'danger');
@@ -353,7 +362,7 @@ function initMaterialsPage() {
                 const res = await apiFetch(`${API_BASE_URL}/materials/${id}`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${Auth.getToken()}` },
-                    body: JSON.stringify({ name, measurement_unit_id: unitId, description })
+                    body: JSON.stringify({ name, measurement_unit_id: unitId, description, minimum_stock: minimumStock })
                 });
 
                 if (res.ok) {

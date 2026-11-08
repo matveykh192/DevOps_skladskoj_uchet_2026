@@ -53,6 +53,11 @@ class Material(Base):
     is_active = Column(Boolean, default=True)
     # текущий остаток материала на складе (денормализованное поле)
     quantity = Column(Numeric(12, 3), nullable=False, default=0)
+    minimum_stock = Column(Numeric(12, 3), nullable=False, default=0, server_default="0")
+
+    @property
+    def is_below_minimum(self):
+        return bool(self.minimum_stock and self.quantity < self.minimum_stock)
 
     measurement_unit = relationship("MeasurementUnit")
 

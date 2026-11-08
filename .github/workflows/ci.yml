@@ -1,0 +1,202 @@
+name: CI Pipeline
+
+on:
+  push:
+    branches: [ "main", "feature/*" ]
+  pull_request:
+    branches: [ "main" ]
+
+# переменные для сборки и реджистри
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  # 1. поиск секретов в репозитории
+  secret-scan:
+    name: secret scanning
+    runs-on: ubuntu-latest
+    steps:
+      - name: checkout кода
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: запуск gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_CONFIG: .gitleaks.toml
+
+  # 2. проверка форматирования и линтинг
+  quality:
+    name: code quality (ruff)
+    runs-on: ubuntu-latest
+    steps:
+      - name: checkout кода
+        uses: actions/checkout@v4
+
+      - name: установка python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: установка ruff
+        run: pip install ruff==0.1.14
+
+      - name: проверка линтером
+        run: ruff check app tests
+
+      - name: проверка форматирования
+        run: ruff format --check app tests
+
+  # 3. статический анализ безопасности кода и аудит зависимостей
+  security:
+    name: security audit (sast & deps)
+    runs-on: ubuntu-latest
+    steps:
+      - name: checkout кода
+        uses: actions/checkout@v4
+
+      - name: установка python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: установка bandit и pip-audit
+        run: pip install bandit==1.7.10 pip-audit==2.7.3
+
+      - name: sast анализ через bandit
+        run: bandit -r app -ll
+
+      - name: аудит уязвимостей в зависимостях
+        run: pip-audit -r requirements.txt || true
+
+  # 4. проверка контейнерных политик (правила из 4 лабы)
+  container-check:
+    name: container compliance check
+    runs-on: ubuntu-latest
+    steps:
+      - name: checkout кода
+        uses: actions/checkout@v4
+
+      - name: установка python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: аудит dockerfile и docker-compose
+        run: python scripts/container_check.py
+
+  # 5. запуск unit и интеграционных тестов с тестовой бд
+  tests:
+    name: unit & integration tests
+    runs-on: ubuntu-latest
+    needs: [quality, security, container-check]
+    steps:
+      - name: checkout кода
+        uses: actions/checkout@v4
+
+      - name: запуск тестового стека и прогон pytest
+        run: |
+          docker compose -p warehouse-lr3-test -f docker-compose.test.yml run --rm test-runner
+
+      - name: сохранение отчетов тестов и покрытия как артефактов
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-and-coverage-reports
+          path: reports/
+          retention-days: 7
+
+  # 6. проверка миграций alembic на чистой и заполненной бд
+  migrations:
+    name: migration verification
+    runs-on: ubuntu-latest
+    needs: [container-check]
+    steps:
+      - name: checkout кода
+        uses: actions/checkout@v4
+
+      - name: запуск проверки миграций в тестовом окружении
+        run: |
+          docker compose -p warehouse-lr3-test -f docker-compose.test.yml run --rm test-runner python scripts/check_migrations.py
+
+  # 7. проверка создания и восстановления бэкапа
+  backup-restore:
+    name: backup and restore check
+    runs-on: ubuntu-latest
+    needs: [container-check]
+    steps:
+      - name: checkout кода
+        uses: actions/checkout@v4
+
+      - name: поднятие тестовой бд
+        run: |
+          docker compose -p warehouse-lr3-test -f docker-compose.test.yml up -d --wait test-db
+
+      - name: запуск проверки бэкапа и восстановления
+        run: |
+          python scripts/backup_restore.py check
+
+  # 8. сборка docker-образа и сканирование уязвимостей перед публикацией
+  scan-image:
+    name: container vulnerability scan (trivy)
+    runs-on: ubuntu-latest
+    needs: [tests, migrations, backup-restore, secret-scan]
+    steps:
+      - name: checkout кода
+        uses: actions/checkout@v4
+
+      - name: сборка локального образа для проверки
+        run: |
+          docker build -t warehouse-app:${{ github.sha }} .
+
+      - name: сканирование образа сканером trivy
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: warehouse-app:${{ github.sha }}
+          format: 'table'
+          exit-code: '0'
+          ignore-unfixed: true
+          vuln-type: 'os,library'
+          severity: 'CRITICAL,HIGH'
+
+  # 9. публикация проверенного образа в ghcr с тегом sha
+  publish:
+    name: build and publish image
+    runs-on: ubuntu-latest
+    needs: [tests, migrations, backup-restore, scan-image, secret-scan]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: checkout кода
+        uses: actions/checkout@v4
+
+      - name: логин в github container registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: генерация метаданных и тегов (sha коммита)
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=sha,prefix=,format=short
+            type=raw,value=latest
+
+      - name: сборка и пуш готового образа
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}

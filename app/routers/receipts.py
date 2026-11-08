@@ -39,51 +39,45 @@ async def get_receipts(db: AsyncSession = Depends(get_db)):
         )
         items = items_result.all()
 
-        total_amount = sum(
-            float(item[0].quantity) * float(item[0].unit_price) for item in items
-        )
+        total_amount = sum(float(item[0].quantity) * float(item[0].unit_price) for item in items)
 
-        output.append({
-            "id": r.id,
-            "receipt_number": r.receipt_number,
-            "supplier_id": r.supplier_id,
-            "receipt_date": r.receipt_date.isoformat() if r.receipt_date else "",
-            "status": r.status,
-            "total_amount": total_amount,
-            "items": [
-                {
-                    "id": item[0].id,
-                    "material_id": item[0].material_id,
-                    "material_name": item[1],
-                    "quantity": float(item[0].quantity),
-                    "unit_price": float(item[0].unit_price),
-                    "line_total": float(item[0].quantity) * float(item[0].unit_price)
-                }
-                for item in items
-            ]
-        })
+        output.append(
+            {
+                "id": r.id,
+                "receipt_number": r.receipt_number,
+                "supplier_id": r.supplier_id,
+                "receipt_date": r.receipt_date.isoformat() if r.receipt_date else "",
+                "status": r.status,
+                "total_amount": total_amount,
+                "items": [
+                    {
+                        "id": item[0].id,
+                        "material_id": item[0].material_id,
+                        "material_name": item[1],
+                        "quantity": float(item[0].quantity),
+                        "unit_price": float(item[0].unit_price),
+                        "line_total": float(item[0].quantity) * float(item[0].unit_price),
+                    }
+                    for item in items
+                ],
+            }
+        )
 
     return output
 
 
 @router.post("/", status_code=201)
 async def create_receipt(
-    data: ReceiptCreate,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    data: ReceiptCreate, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)
 ):
     if not data.receipt_number or not data.receipt_number.strip():
         raise HTTPException(status_code=400, detail="Номер документа обязателен")
 
-    result = await db.execute(
-        select(Receipt).where(Receipt.receipt_number == data.receipt_number)
-    )
+    result = await db.execute(select(Receipt).where(Receipt.receipt_number == data.receipt_number))
     if result.scalars().first():
         raise HTTPException(status_code=400, detail="документ с таким номером уже есть")
 
-    result = await db.execute(
-        select(Supplier).where(Supplier.name == data.supplier_name)
-    )
+    result = await db.execute(select(Supplier).where(Supplier.name == data.supplier_name))
     supplier = result.scalars().first()
     if not supplier:
         supplier = Supplier(name=data.supplier_name, is_active=True)
@@ -95,7 +89,7 @@ async def create_receipt(
         supplier_id=supplier.id,
         receipt_date=datetime.strptime(data.receipt_date, "%Y-%m-%d").date(),
         status="registered",
-        created_by=current_user.id
+        created_by=current_user.id,
     )
     db.add(new_receipt)
     await db.flush()
@@ -109,20 +103,19 @@ async def create_receipt(
         material = result.scalars().first()
         if not material:
             material = Material(
-                name=material_name,
-                measurement_unit_id=item_data.measurement_unit_id,
-                is_active=True,
-                quantity=0
+                name=material_name, measurement_unit_id=item_data.measurement_unit_id, is_active=True, quantity=0
             )
             db.add(material)
             await db.flush()
 
-        db.add(ReceiptItem(
-            receipt_id=new_receipt.id,
-            material_id=material.id,
-            quantity=item_data.quantity,
-            unit_price=item_data.unit_price
-        ))
+        db.add(
+            ReceiptItem(
+                receipt_id=new_receipt.id,
+                material_id=material.id,
+                quantity=item_data.quantity,
+                unit_price=item_data.unit_price,
+            )
+        )
         material.quantity = float(material.quantity or 0) + float(item_data.quantity)
 
     await db.commit()
@@ -131,9 +124,7 @@ async def create_receipt(
 
 @router.delete("/{receipt_id}")
 async def delete_receipt(
-    receipt_id: int,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    receipt_id: int, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)
 ):
     result = await db.execute(select(Receipt).where(Receipt.id == receipt_id))
     receipt = result.scalars().first()
@@ -141,9 +132,7 @@ async def delete_receipt(
         raise HTTPException(status_code=404, detail="поступление не найдено")
 
     # откатываем остатки по материалам
-    items_result = await db.execute(
-        select(ReceiptItem).where(ReceiptItem.receipt_id == receipt_id)
-    )
+    items_result = await db.execute(select(ReceiptItem).where(ReceiptItem.receipt_id == receipt_id))
     items = items_result.scalars().all()
 
     for item in items:

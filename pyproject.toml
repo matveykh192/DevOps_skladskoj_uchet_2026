@@ -1,0 +1,21 @@
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+addopts = "--strict-markers"
+markers = [
+    "unit: tests isolated from external services",
+    "integration: tests involving a real PostgreSQL database",
+]
+
+[tool.coverage.run]
+source = ["app"]
+branch = true
+omit = ["*/__init__.py"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+exclude = [".git", ".venv", "venv", "reports"]
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F"]

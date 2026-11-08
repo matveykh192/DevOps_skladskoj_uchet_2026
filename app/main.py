@@ -1,41 +1,39 @@
 import logging
+import os
+import socket
+from pathlib import Path
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.exceptions import RequestValidationError
 from fastapi.openapi.utils import get_openapi
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
-from pathlib import Path
 
 from app.config import settings
 from app.database import engine
 from app.routers import materials, suppliers, auth, receipts, issues, frontend
 
-# ==========================================
-# Логирование
-# ==========================================
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
-)
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
 logger = logging.getLogger("warehouse")
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-app = FastAPI(
-    title="Складской учёт",
-    description="API для управления складом",
-    version="0.1.0"
-)
+INSTANCE_ID = os.getenv("INSTANCE_ID") or socket.gethostname()
 
-# ==========================================
-# Раздача статики
-# ==========================================
+app = FastAPI(title="Складской учёт", description="API для управления складом", version="0.1.0")
+
+
+@app.middleware("http")
+async def add_instance_header(request: Request, call_next):
+    response = await call_next(request)
+    response.headers["X-Instance-Id"] = INSTANCE_ID
+    return response
+
+
 app.mount("/static", StaticFiles(directory=BASE_DIR / "frontend" / "static"), name="static")
 
-# ==========================================
-# Роутеры
-# ==========================================
+
 app.include_router(auth.router)
 app.include_router(materials.router)
 app.include_router(suppliers.router)
@@ -43,9 +41,6 @@ app.include_router(receipts.router)
 app.include_router(issues.router)
 app.include_router(frontend.router)
 
-# ==========================================
-# Кастомные обработчики ошибок
-# ==========================================
 
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
@@ -59,34 +54,22 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
     detail = "Ошибка валидации данных: " + "; ".join(errors) if errors else "Ошибка валидации данных"
     logger.warning("[422] %s %s — %s", request.method, request.url.path, detail)
 
-    return JSONResponse(
-        status_code=422,
-        content={"detail": detail, "errors": exc.errors()}
-    )
+    return JSONResponse(status_code=422, content={"detail": detail, "errors": exc.errors()})
 
 
 @app.exception_handler(HTTPException)
 async def http_exception_handler(request: Request, exc: HTTPException):
     """Единый формат для HTTPException (400/401/404/...)."""
     logger.info("[%s] %s %s — %s", exc.status_code, request.method, request.url.path, exc.detail)
-    return JSONResponse(
-        status_code=exc.status_code,
-        content={"detail": exc.detail}
-    )
+    return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
 
 
 @app.exception_handler(Exception)
 async def unhandled_exception_handler(request: Request, exc: Exception):
     """Ловим всё, что не поймали — 500 с понятным сообщением."""
     logger.exception("[500] %s %s — необработанная ошибка: %s", request.method, request.url.path, exc)
-    return JSONResponse(
-        status_code=500,
-        content={"detail": "Внутренняя ошибка сервера"}
-    )
+    return JSONResponse(status_code=500, content={"detail": "Внутренняя ошибка сервера"})
 
-# ==========================================
-# OpenAPI (кнопка Authorize в Swagger)
-# ==========================================
 
 def custom_openapi():
     if app.openapi_schema:
@@ -98,10 +81,7 @@ def custom_openapi():
         routes=app.routes,
     )
     openapi_schema["components"]["securitySchemes"] = {
-        "OAuth2PasswordBearer": {
-            "type": "oauth2",
-            "flows": {"password": {"tokenUrl": "/auth/login", "scopes": {}}}
-        }
+        "OAuth2PasswordBearer": {"type": "oauth2", "flows": {"password": {"tokenUrl": "/auth/login", "scopes": {}}}}
     }
     app.openapi_schema = openapi_schema
     return app.openapi_schema
@@ -109,9 +89,6 @@ def custom_openapi():
 
 app.openapi = custom_openapi
 
-# ==========================================
-# Health-check
-# ==========================================
 
 @app.get("/health", tags=["System"])
 async def health_check():
@@ -135,18 +112,24 @@ async def health_check():
         content={
             "status": "healthy" if ok else "unhealthy",
             "database": db_status,
-            "version": app.version
-        }
+            "version": app.version,
+            "instance": INSTANCE_ID,
+        },
     )
 
 
-# ==========================================
-# Startup: вывести подхваченные настройки (без секретов)
-# ==========================================
 @app.on_event("startup")
 async def startup_event():
     logger.info("=== Приложение запускается ===")
     logger.info("Версия: %s", app.version)
+    logger.info("Экземпляр (Instance ID): %s", INSTANCE_ID)
     logger.info("DB host: %s", settings.DB_HOST)
     logger.info("DB name: %s", settings.DB_NAME)
     logger.info("SECRET_KEY настроен: %s", bool(settings.SECRET_KEY))
+
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    logger.info("=== Приложение завершает работу (graceful shutdown) ===")
+    await engine.dispose()
+    logger.info("Пул соединений с БД закрыт.")
