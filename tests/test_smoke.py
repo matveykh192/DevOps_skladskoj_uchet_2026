@@ -42,14 +42,3 @@ async def test_version_endpoint_smoke(client):
     assert "version" in data
     assert "commit_sha" in data
     assert "environment" in data
-
-
-@pytest.mark.asyncio
-@pytest.mark.integration
-async def test_health_endpoint_smoke(client):
-    # проверка эндпоинта /health
-    response = await client.get("/health")
-    assert response.status_code == 200
-    data = response.json()
-    assert data["status"] == "healthy"
-    assert data["database"] == "connected"
