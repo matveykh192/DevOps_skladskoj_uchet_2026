@@ -1,7 +1,7 @@
 # Project verification workflow. GNU Make on Windows/Linux.
 COMPOSE = docker compose
 TEST_COMPOSE = $(COMPOSE) -p warehouse-lr3-test -f docker-compose.test.yml
-.PHONY: help setup up down run test test-unit test-integration quality sast verify migrate backup restore restore-main backup-demo restore-demo backup-check test-clean container-check migration-check restore-new-volume
+.PHONY: help setup up down run test test-unit test-integration quality sast verify migrate backup restore restore-main backup-demo restore-demo backup-check test-clean container-check migration-check restore-new-volume deploy rollback staging-up staging-down staging-check
 
 help:
 	@echo "setup up down run test test-unit test-integration quality sast verify migrate backup restore restore-main backup-demo restore-demo backup-check test-clean container-check restore-new-volume"
@@ -81,3 +81,22 @@ backup-check:
 
 test-clean:
 	$(TEST_COMPOSE) down -v --remove-orphans
+
+# команды непрерывного развертывания и управления релизом (лр6)
+TAG ?= latest
+PORT ?= 8080
+
+deploy:
+	python scripts/deploy.py --tag $(TAG) --port $(PORT)
+
+rollback:
+	python scripts/deploy.py --rollback --port $(PORT)
+
+staging-up:
+	docker compose -f docker-compose.staging.yml up -d
+
+staging-down:
+	docker compose -f docker-compose.staging.yml down
+
+staging-check:
+	python scripts/deploy.py --check-only --port $(PORT)

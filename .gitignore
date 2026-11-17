@@ -38,3 +38,9 @@ lr3_migration_sources.zip
 .env
 .env.*
 !.env.example
+!deploy/.env.staging.example
+
+# CD runtime release state
+deploy/.deploy.lock
+deploy/.last_successful_release
+deploy/releases.log

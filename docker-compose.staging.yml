@@ -1,0 +1,98 @@
+# предэксплуатационное окружение (staging) для лр6
+# ключевое правило: сборка на сервере запрещена, образ берется готовым из registry
+services:
+  staging-db:
+    image: postgres:15-alpine
+    container_name: warehouse_staging_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${WAREHOUSE_DB_USER:-warehouse_staging_user}
+      POSTGRES_PASSWORD: ${WAREHOUSE_DB_PASSWORD:-staging_secure_password_2026}
+      POSTGRES_DB: ${WAREHOUSE_DB_NAME:-warehouse_staging_db}
+    volumes:
+      - warehouse_staging_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${WAREHOUSE_DB_USER:-warehouse_staging_user} -d ${WAREHOUSE_DB_NAME:-warehouse_staging_db}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          cpus: '0.2'
+          memory: 128M
+    networks:
+      - warehouse_staging_net
+
+  staging-app:
+    # строго из registry без пересборки (требование 3 лр6)
+    image: ${REGISTRY_IMAGE:-warehouse-app}:${IMAGE_TAG:-latest}
+    container_name: warehouse_staging_app
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${WAREHOUSE_DB_USER:-warehouse_staging_user}:${WAREHOUSE_DB_PASSWORD:-staging_secure_password_2026}@staging-db:5432/${WAREHOUSE_DB_NAME:-warehouse_staging_db}
+      DB_HOST: staging-db
+      DB_NAME: ${WAREHOUSE_DB_NAME:-warehouse_staging_db}
+      SECRET_KEY: ${WAREHOUSE_SECRET_KEY:-staging-demo-secret-key-change-me}
+      APP_ENV: ${APP_ENV:-staging}
+      APP_VERSION: ${IMAGE_TAG:-latest}
+      COMMIT_SHA: ${COMMIT_SHA:-local}
+    depends_on:
+      staging-db:
+        condition: service_healthy
+    expose:
+      - "8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    deploy:
+      resources:
+        limits:
+          cpus: '0.75'
+          memory: 512M
+        reservations:
+          cpus: '0.1'
+          memory: 128M
+    networks:
+      - warehouse_staging_net
+
+  staging-nginx:
+    image: nginx:1.27.2-alpine
+    container_name: warehouse_staging_nginx
+    restart: unless-stopped
+    ports:
+      - "${STAGING_PORT:-8080}:80"
+    volumes:
+      - ./deploy/nginx/nginx.staging.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      staging-app:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1/nginx-health || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 128M
+        reservations:
+          cpus: '0.05'
+          memory: 32M
+    networks:
+      - warehouse_staging_net
+
+volumes:
+  warehouse_staging_data:
+
+networks:
+  warehouse_staging_net:
+    driver: bridge
