@@ -11,6 +11,7 @@ __pycache__
 .env
 .env.*
 !.env.example
+!deploy/.env.staging.example
 
 # Backup archives and test artifacts
 backups/*.dump

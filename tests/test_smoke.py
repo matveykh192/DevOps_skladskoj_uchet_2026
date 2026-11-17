@@ -29,3 +29,27 @@ async def test_postgresql_is_reachable():
             assert result.scalar_one() == "warehouse_test_db"
     finally:
         await engine.dispose()
+
+
+@pytest.mark.asyncio
+@pytest.mark.integration
+async def test_version_endpoint_smoke(client):
+    # проверка эндпоинта /version для лр6
+    response = await client.get("/version")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "ok"
+    assert "version" in data
+    assert "commit_sha" in data
+    assert "environment" in data
+
+
+@pytest.mark.asyncio
+@pytest.mark.integration
+async def test_health_endpoint_smoke(client):
+    # проверка эндпоинта /health
+    response = await client.get("/health")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "healthy"
+    assert data["database"] == "connected"

@@ -5,6 +5,7 @@
 # тесты и тестовые сценарии
 /tests/ @matveykh192
 /docker-compose.test.yml @matveykh192
+/docker-compose.staging.yml @matveykh192
 /Dockerfile.test @matveykh192
 
 # сборочные файлы и гейты проверок
@@ -12,7 +13,9 @@
 /scripts/container_check.py @matveykh192
 /scripts/check_migrations.py @matveykh192
 /scripts/backup_restore.py @matveykh192
+/scripts/restore_new_volume.py @matveykh192
 /scripts/check_mutation.ps1 @matveykh192
+/scripts/deploy.py @matveykh192
 
 # конфигурация линтеров и анализаторов
 /pyproject.toml @matveykh192

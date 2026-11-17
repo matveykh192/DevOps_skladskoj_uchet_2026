@@ -112,10 +112,26 @@ async def health_check():
         content={
             "status": "healthy" if ok else "unhealthy",
             "database": db_status,
-            "version": app.version,
+            "version": os.getenv("APP_VERSION", app.version),
+            "commit_sha": os.getenv("COMMIT_SHA", "unknown"),
             "instance": INSTANCE_ID,
         },
     )
+
+
+@app.get("/version", tags=["System"])
+async def version_check():
+    """
+    служебный адрес для проверки работающей версии релиза (лр6).
+    возвращает текущую версию, commit sha, тип окружения и id экземпляра.
+    """
+    return {
+        "status": "ok",
+        "version": os.getenv("APP_VERSION", app.version),
+        "commit_sha": os.getenv("COMMIT_SHA", "unknown"),
+        "environment": os.getenv("APP_ENV", "production"),
+        "instance": INSTANCE_ID,
+    }
 
 
 @app.on_event("startup")
